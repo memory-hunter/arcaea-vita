@@ -11,20 +11,22 @@ project(so_loader C CXX)
 include("${VITASDK}/share/vita.cmake" REQUIRED)
 
 # Vita application configuration
-set(VITA_APP_NAME "so-loader")
-set(VITA_TITLEID "SLDR00000")
-set(VITA_VPKNAME "so_loader")
+set(VITA_APP_NAME "Arcaea")
+set(VITA_TITLEID "ARCA69420")
+set(VITA_VPKNAME "arcaea")
 set(VITA_VERSION "01.00")
 set(VITA_MKSFOEX_FLAGS "-d ATTRIBUTE2=12")
 
 # Optional: used for "send" and "dump" targets
-set(PSVITAIP "192.168.0.198" CACHE STRING "PSVita IP (for FTP access)")
+set(PSVITAIP "192.168.178.58" CACHE STRING "PSVita IP (for FTP access)")
 set(PARSECOREPATH "$ENV{PARSECOREPATH}" CACHE STRING "vita-parse-core main.py")
 
 # Game-specific definitions
-set(DATA_PATH "ux0:data/gamename/") # Path to data (with trailing /)
-set(SO_PATH "${DATA_PATH}main.so") # Path to .so
-add_definitions(-DDATA_PATH="${DATA_PATH}" -DSO_PATH="${SO_PATH}")
+set(DATA_PATH "ux0:data/arcaea/") # Path to data (with trailing /)
+set(SO_PATH "${DATA_PATH}libcocos2dcpp.so") # Path to .so
+set(FMOD_PATH "${DATA_PATH}libfmod.so") # Path to .so
+set(PROVIDER_PATH "${DATA_PATH}libfmodProvider.so") # Path to .so
+add_definitions(-DDATA_PATH="${DATA_PATH}" -DSO_PATH="${SO_PATH}" -DFMOD_PATH="${FMOD_PATH}" -DPROVIDER_PATH="${PROVIDER_PATH}")
 
 # Port type
 option(NDK_PORT "This should be on if the game is done with Android NDK (has an android_main entry point)" OFF)
@@ -73,10 +75,10 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   #add_definitions(-DDEBUG_PIPEFD=1)
   #add_definitions(-DDEBUG_CALLBACKS=1)
   # Space-separated flags passed to vitaGL
-  set(VITAGL_MAKE_FLAGS "SOFTFP_ABI=1 TEST=1 LOG_ERRORS=1")
+  set(VITAGL_MAKE_FLAGS "SOFTFP_ABI=1 TEST=1 LOG_ERRORS=1 HAVE_SHADER_CACHE=1")
 else()
   # Space-separated flags passed to vitaGL
-  set(VITAGL_MAKE_FLAGS "SOFTFP_ABI=1 NO_DEBUG=1")
+  set(VITAGL_MAKE_FLAGS "SOFTFP_ABI=1 NO_DEBUG=1 HAVE_SHADER_CACHE=1")
 endif()
 
 # makes sincos, sincosf, etc. visible
@@ -98,6 +100,7 @@ set(SOURCES
     source/dynlib.c
     source/java.c
     source/patch.c
+    source/SharedPreferences.cpp
     source/reimpl/bits/_ctype.c
     source/reimpl/errno.c
     source/reimpl/io.c
@@ -191,6 +194,8 @@ endif()
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
                       -Wl,--whole-archive pthread -Wl,--no-whole-archive
+                      fmodpp
+					            fmodstudio_stub
                       OpenSLES
                       sndfile
                       mp3lame
