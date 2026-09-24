@@ -22,7 +22,6 @@ extern "C"
 {
 #endif
 	extern so_module so_mod;
-	extern so_module fmod_mod;
 	extern so_module provider_mod;
 #ifdef __cplusplus
 };
@@ -32,8 +31,12 @@ extern "C"
 
 #include "utils/logger.h"
 #include "utils/dialog.h"
+#include "utils/utils.h"
 #include "reimpl/sys.h"
 #include <stdbool.h>
+#include <stdint.h>
+
+static void *retthis(void *this_) { return this_; }
 
 void __kuser_memory_barrier(void)
 {
@@ -56,23 +59,6 @@ void kuser_patch(void)
 
 	uint32_t patched_addr;
 	for (uint32_t addr = so_mod.text_base; addr < so_mod.text_base + so_mod.text_size; addr += 4)
-	{
-		uint32_t *a = (uint32_t *)addr;
-		if (*a == 0xFFFF0FC0)
-		{
-			l_debug("Patching 0x%x -> __kuser_cmpxchg", a);
-			patched_addr = 0x9F000FC0;
-			kuKernelCpuUnrestrictedMemcpy((void *)(addr), &patched_addr, sizeof(uint32_t));
-		}
-		else if (*a == 0xFFFF0FA0)
-		{
-			l_debug("Patching 0x%x -> __kuser_memory_barrier", a);
-			patched_addr = 0x9F000FA0;
-			kuKernelCpuUnrestrictedMemcpy((void *)(addr), &patched_addr, sizeof(uint32_t));
-		}
-	}
-
-	for (uint32_t addr = fmod_mod.text_base; addr < fmod_mod.text_base + fmod_mod.text_size; addr += 4)
 	{
 		uint32_t *a = (uint32_t *)addr;
 		if (*a == 0xFFFF0FC0)
@@ -120,27 +106,6 @@ static int sqlite3_open_v2_patched(const char *filename, void **ppDb, int flags,
 	return ret;
 }
 
-// so_hook cxa_throw_hook;
-
-// static int cxa_throw_patched(void *thrown_exception, void *type_info, void (*dest)(void *))
-// {
-// 	l_debug("__cxa_throw(obj=%p, type_info=%p, dest=%p) called, caller: %p", thrown_exception, type_info, dest, __builtin_return_address(0));
-
-// 	return SO_CONTINUE(int, cxa_throw_hook, thrown_exception, type_info, dest);
-// }
-
-// so_hook __throw_system_error_hook;
-
-// static int __throw_system_error_patched(int error_code, const char *message)
-// {
-// 	l_debug("__throw_system_error(%d, \"%s\") caller=%p", error_code, message ? message : "(null)", __builtin_return_address(0));
-
-// 	SO_CONTINUE(int, __throw_system_error_hook, error_code, message);
-// }
-
-static int ret0(void) { return 0; }
-static void *retthis(void *this_) { return this_; }
-
 void so_patch(void)
 {
 	kuser_patch();
@@ -161,11 +126,4 @@ void so_patch(void)
 	hook_addr((uintptr_t)so_symbol(&so_mod, "_ZN6sdkbox20GPGAchievementsProxyD0Ev"), (uintptr_t)&ret0);
 	hook_addr((uintptr_t)so_symbol(&so_mod, "_ZN6sdkbox20GPGAchievementsProxyD1Ev"), (uintptr_t)&ret0);
 	hook_addr((uintptr_t)so_symbol(&so_mod, "_ZN6sdkbox20GPGAchievementsProxyD2Ev"), (uintptr_t)&ret0);
-
-	// patch string for userdefault.xml
-	// char *data_data_str = (char *)(so_mod.text_base + 0x93F7CC);
-	// strcpy(data_data_str, "ux0:data/");
-
-	// cxa_throw_hook = hook_addr((uintptr_t)so_symbol(&so_mod, "__cxa_throw"), (uintptr_t)&cxa_throw_patched);
-	// __throw_system_error_hook = hook_addr((uintptr_t)so_symbol(&so_mod, "_ZNSt6__ndk120__throw_system_errorEiPKc"), (uintptr_t)&__throw_system_error_patched);
 }

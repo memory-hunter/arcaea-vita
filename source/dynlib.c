@@ -139,7 +139,7 @@ extern void *_ZN4FMOD6System11mixerResumeEv;
 extern void *FMOD_System_Create;
 extern void *_ZN4FMOD6System17setSoftwareFormatEi16FMOD_SPEAKERMODEi;
 extern void *_ZN4FMOD6System4initEijPv;
-extern void *_ZN4FMOD6System12createStreamEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE;
+extern int _ZN4FMOD6System12createStreamEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE(void *system, const char *name_or_data, unsigned int mode, void *exinfo, void **sound);
 extern void *_ZN4FMOD5Sound7setModeEj;
 extern void *_ZN4FMOD6System9playSoundEPNS_5SoundEPNS_12ChannelGroupEbPPNS_7ChannelE;
 extern void *_ZN4FMOD5Sound7releaseEv;
@@ -160,11 +160,14 @@ static const char *ANDROID_ASSET_PREFIX = "file:///android_asset/";
 
 const char *remap_fmod_path(const char *name_or_data, unsigned int mode, char *out_buf, size_t out_buf_size)
 {
+	if (!name_or_data) return NULL;
+
 	size_t prefix_len = strlen(ANDROID_ASSET_PREFIX);
 	if (strncmp(name_or_data, ANDROID_ASSET_PREFIX, prefix_len) == 0)
 	{
-	    const char *rel_path = name_or_data + prefix_len;
-		snprintf(out_buf, out_buf_size, "%s%s", DATA_PATH"assets/", rel_path);
+		const char *rel_path = name_or_data + prefix_len;
+		int written = snprintf(out_buf, out_buf_size, "%s%s", DATA_PATH "assets/", rel_path);
+		if (written < 0 || (size_t)written >= out_buf_size) return name_or_data;
 		return out_buf;
 	}
 
@@ -181,6 +184,133 @@ int FMOD_System_CreateSound_hook(void *system, const char *name_or_data, unsigne
 	int ret = _ZN4FMOD6System11createSoundEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE(system, final_path, mode, exinfo, sound);
 
 	return ret;
+}
+
+typedef struct FMOD_SOUND FMOD_SOUND;
+typedef struct FMOD_SOUNDGROUP FMOD_SOUNDGROUP;
+typedef int FMOD_SOUND_FORMAT;
+typedef int FMOD_CHANNELORDER;
+typedef int FMOD_TIMEUNIT;
+typedef int FMOD_SOUND_TYPE;
+
+typedef int (*FMOD_FILE_OPEN_CALLBACK)(const char *, unsigned int *, void **, void *);
+typedef int (*FMOD_FILE_CLOSE_CALLBACK)(void *, void *);
+typedef int (*FMOD_FILE_READ_CALLBACK)(void *, void *, unsigned int, unsigned int *, void *);
+typedef int (*FMOD_FILE_SEEK_CALLBACK)(void *, unsigned int, void *);
+typedef int (*FMOD_FILE_ASYNCREAD_CALLBACK)(void *, void *, void *);
+typedef int (*FMOD_FILE_ASYNCCANCEL_CALLBACK)(void *, void *, void *);
+typedef int (*FMOD_SOUND_NONBLOCK_CALLBACK)(FMOD_SOUND *, int);
+typedef int (*FMOD_SOUND_PCMREAD_CALLBACK)(FMOD_SOUND *, void *, unsigned int);
+typedef int (*FMOD_SOUND_PCMSETPOS_CALLBACK)(FMOD_SOUND *, int, unsigned int, FMOD_TIMEUNIT);
+
+typedef struct FMOD_CREATESOUNDEXINFO {
+	int cbsize;
+	unsigned int length;
+	unsigned int fileoffset;
+	int numchannels;
+	int defaultfrequency;
+	FMOD_SOUND_FORMAT format;
+	unsigned int decodebuffersize;
+	int initialsubsound;
+	int numsubsounds;
+	int *subsoundlist;
+	int inclusionlistnum;
+	FMOD_SOUND_PCMREAD_CALLBACK pcmreadcallback;
+	FMOD_SOUND_PCMSETPOS_CALLBACK pcmsetposcallback;
+	FMOD_SOUND_NONBLOCK_CALLBACK nonblockcallback;
+	const char *dlsname;
+	const char *encryptionkey;
+	int maxpolyphony;
+	void *userdata;
+	FMOD_SOUND_TYPE suggestedsoundtype;
+	FMOD_FILE_OPEN_CALLBACK fileuseropen;
+	FMOD_FILE_CLOSE_CALLBACK fileuserclose;
+	FMOD_FILE_READ_CALLBACK fileuserread;
+	FMOD_FILE_SEEK_CALLBACK fileuserseek;
+	FMOD_FILE_ASYNCREAD_CALLBACK fileuserasyncread;
+	FMOD_FILE_ASYNCCANCEL_CALLBACK fileuserasynccancel;
+	void *fileuserdata;
+	int filebuffersize;
+	FMOD_CHANNELORDER channelorder;
+	FMOD_SOUNDGROUP *initialsoundgroup;
+	unsigned int initialseekposition;
+	FMOD_TIMEUNIT initialseekpostype;
+	int ignoresetfilesystem;
+	unsigned int audioqueuepolicy;
+	unsigned int minmidigranularity;
+	int nonblockthreadid;
+	void *fsbguid;
+} FMOD_CREATESOUNDEXINFO;
+
+enum {
+	FMOD_ERR_FILE_BAD = 13,
+	FMOD_ERR_FILE_COULDNOTSEEK = 14,
+	FMOD_ERR_FILE_NOTFOUND = 18
+};
+
+static int fmod_fios_file_open(const char *name, unsigned int *filesize, void **handle, void *userdata)
+{
+	if (!handle) return FMOD_ERR_FILE_BAD;
+	int32_t fios_handle = fios_asset_open(name);
+	if (fios_handle < 0) return FMOD_ERR_FILE_NOTFOUND;
+	int64_t size = fios_asset_size(fios_handle);
+	if (size < 0 || (uint64_t)size > UINT32_MAX) {
+		fios_asset_close(fios_handle);
+		return FMOD_ERR_FILE_BAD;
+	}
+	if (filesize) *filesize = (unsigned int)size;
+	*handle = (void *)(uintptr_t)((uint32_t)fios_handle + 1u);
+	return 0;
+}
+
+static int fmod_fios_file_close(void *handle, void *userdata)
+{
+	if (!handle) return FMOD_ERR_FILE_BAD;
+	return fios_asset_close((int32_t)((uintptr_t)handle - 1u)) < 0 ? FMOD_ERR_FILE_BAD : 0;
+}
+
+static int fmod_fios_file_read(void *handle, void *buffer, unsigned int sizebytes, unsigned int *bytesread, void *userdata)
+{
+	if (!handle) return FMOD_ERR_FILE_BAD;
+	int64_t ret = fios_asset_read((int32_t)((uintptr_t)handle - 1u), buffer, sizebytes);
+	if (ret < 0) return FMOD_ERR_FILE_BAD;
+	if (bytesread) *bytesread = (unsigned int)ret;
+	return 0;
+}
+
+static int fmod_fios_file_seek(void *handle, unsigned int pos, void *userdata)
+{
+	if (!handle) return FMOD_ERR_FILE_BAD;
+	return fios_asset_seek((int32_t)((uintptr_t)handle - 1u), pos, SEEK_SET) < 0 ? FMOD_ERR_FILE_COULDNOTSEEK : 0;
+}
+
+static int FMOD_System_CreateStream_hook(void *system, const char *name_or_data, unsigned int mode, void *exinfo, void **sound)
+{
+	char remapped_path[512];
+	const char *stream_path = remap_fmod_path(name_or_data, mode, remapped_path, sizeof(remapped_path));
+	char normalized[512], archive_path[640];
+	if (!fios_asset_path(stream_path, normalized, sizeof(normalized), archive_path, sizeof(archive_path)))
+		return _ZN4FMOD6System12createStreamEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE(system, stream_path, mode, exinfo, sound);
+
+	FMOD_CREATESOUNDEXINFO fios_exinfo = {0};
+	if (exinfo) {
+		FMOD_CREATESOUNDEXINFO *original = (FMOD_CREATESOUNDEXINFO *)exinfo;
+		if (original->cbsize >= (int)sizeof(int)) {
+			size_t copy_size = (size_t)original->cbsize;
+			if (copy_size > sizeof(fios_exinfo)) copy_size = sizeof(fios_exinfo);
+			memcpy(&fios_exinfo, exinfo, copy_size);
+		}
+	}
+	fios_exinfo.cbsize = sizeof(fios_exinfo);
+	fios_exinfo.fileuseropen = fmod_fios_file_open;
+	fios_exinfo.fileuserclose = fmod_fios_file_close;
+	fios_exinfo.fileuserread = fmod_fios_file_read;
+	fios_exinfo.fileuserseek = fmod_fios_file_seek;
+	fios_exinfo.fileuserasyncread = NULL;
+	fios_exinfo.fileuserasynccancel = NULL;
+
+	l_debug("FMOD::System::createStream<FIOS>(name=\"%s\", mode=0x%x)", normalized, mode);
+	return _ZN4FMOD6System12createStreamEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE(system, normalized, mode, &fios_exinfo, sound);
 }
 
 static FILE __sF_fake[3];
@@ -213,7 +343,7 @@ so_default_dynlib default_dynlib[] = {
         { "FMOD_System_Create", (uintptr_t)&_ZN4FMOD13System_CreateEPPNS_6SystemE },
         { "_ZN4FMOD6System17setSoftwareFormatEi16FMOD_SPEAKERMODEi", (uintptr_t)&_ZN4FMOD6System17setSoftwareFormatEi16FMOD_SPEAKERMODEi },
         { "_ZN4FMOD6System4initEijPv", (uintptr_t)&_ZN4FMOD6System4initEijPv },
-        { "_ZN4FMOD6System12createStreamEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE", (uintptr_t)&_ZN4FMOD6System12createStreamEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE },
+        { "_ZN4FMOD6System12createStreamEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE", (uintptr_t)&FMOD_System_CreateStream_hook },
         { "_ZN4FMOD5Sound7setModeEj", (uintptr_t)&_ZN4FMOD5Sound7setModeEj },
         { "_ZN4FMOD6System9playSoundEPNS_5SoundEPNS_12ChannelGroupEbPPNS_7ChannelE", (uintptr_t)&_ZN4FMOD6System9playSoundEPNS_5SoundEPNS_12ChannelGroupEbPPNS_7ChannelE },
         { "_ZN4FMOD5Sound7releaseEv", (uintptr_t)&_ZN4FMOD5Sound7releaseEv },
@@ -525,23 +655,23 @@ so_default_dynlib default_dynlib[] = {
 
         #ifdef USE_SCELIBC_IO
             { "fdopen", (uintptr_t)&sceLibcBridge_fdopen },
-            { "feof", (uintptr_t)&sceLibcBridge_feof },
-            { "ferror", (uintptr_t)&sceLibcBridge_ferror },
+            { "feof", (uintptr_t)&feof_soloader },
+            { "ferror", (uintptr_t)&ferror_soloader },
             { "fflush", (uintptr_t)&sceLibcBridge_fflush },
-            { "fgetc", (uintptr_t)&sceLibcBridge_fgetc },
+            { "fgetc", (uintptr_t)&fgetc_soloader },
             { "fgetpos", (uintptr_t)&sceLibcBridge_fgetpos },
-            { "fgets", (uintptr_t)&sceLibcBridge_fgets },
+            { "fgets", (uintptr_t)&fgets_soloader },
             { "fileno", (uintptr_t)&sceLibcBridge_fileno },
             { "fputc", (uintptr_t)&sceLibcBridge_fputc },
             { "fputs", (uintptr_t)&sceLibcBridge_fputs },
-            { "fread", (uintptr_t)&sceLibcBridge_fread },
+            { "fread", (uintptr_t)&fread_soloader },
             { "freopen", (uintptr_t)&sceLibcBridge_freopen },
-            { "fseek", (uintptr_t)&sceLibcBridge_fseek },
+            { "fseek", (uintptr_t)&fseek_soloader },
             { "fsetpos", (uintptr_t)&sceLibcBridge_fsetpos },
-            { "ftell", (uintptr_t)&sceLibcBridge_ftell },
+            { "ftell", (uintptr_t)&ftell_soloader },
             { "fwide", (uintptr_t)&sceLibcBridge_fwide },
             { "fwrite", (uintptr_t)&sceLibcBridge_fwrite },
-            { "getc", (uintptr_t)&sceLibcBridge_getc },
+            { "getc", (uintptr_t)&getc_soloader },
             { "getwc", (uintptr_t)&sceLibcBridge_getwc },
             { "putc", (uintptr_t)&sceLibcBridge_putc },
             { "putchar", (uintptr_t)&sceLibcBridge_putchar },
@@ -552,23 +682,23 @@ so_default_dynlib default_dynlib[] = {
             { "ungetwc", (uintptr_t)&sceLibcBridge_ungetwc },
         #else
             { "fdopen", (uintptr_t)&fdopen },
-            { "feof", (uintptr_t)&feof },
-            { "ferror", (uintptr_t)&ferror },
+            { "feof", (uintptr_t)&feof_soloader },
+            { "ferror", (uintptr_t)&ferror_soloader },
             { "fflush", (uintptr_t)&fflush },
-            { "fgetc", (uintptr_t)&fgetc },
+            { "fgetc", (uintptr_t)&fgetc_soloader },
             { "fgetpos", (uintptr_t)&fgetpos },
-            { "fgets", (uintptr_t)&fgets },
+            { "fgets", (uintptr_t)&fgets_soloader },
             { "fileno", (uintptr_t)&fileno },
             { "fputc", (uintptr_t)&fputc },
             { "fputs", (uintptr_t)&fputs },
-            { "fread", (uintptr_t)&fread },
+            { "fread", (uintptr_t)&fread_soloader },
             { "freopen", (uintptr_t)&freopen },
-            { "fseek", (uintptr_t)&fseek },
+            { "fseek", (uintptr_t)&fseek_soloader },
             { "fsetpos", (uintptr_t)&fsetpos },
-            { "ftell", (uintptr_t)&ftell },
+            { "ftell", (uintptr_t)&ftell_soloader },
             { "fwide", (uintptr_t)&fwide },
             { "fwrite", (uintptr_t)&fwrite },
-            { "getc", (uintptr_t)&getc },
+            { "getc", (uintptr_t)&getc_soloader },
             { "getwc", (uintptr_t)&getwc },
             { "putc", (uintptr_t)&putc },
             { "putchar", (uintptr_t)&putchar },
@@ -584,17 +714,17 @@ so_default_dynlib default_dynlib[] = {
         { "chdir", (uintptr_t)&chdir },
         { "chmod", (uintptr_t)&chmod },
         { "dup", (uintptr_t)&dup },
-        { "fseeko", (uintptr_t)&fseeko }, // TODO: wrap normal fseek for SceLibc version?
-        { "ftello", (uintptr_t)&ftello },
+        { "fseeko", (uintptr_t)&fseek_soloader },
+        { "ftello", (uintptr_t)&ftell_soloader },
         { "ftruncate", (uintptr_t)&ftruncate },
         { "getcwd", (uintptr_t)&getcwd_hook },
-        { "lseek", (uintptr_t)&lseek },
+        { "lseek", (uintptr_t)&lseek_soloader },
         { "lseek64", (uintptr_t)&lseek64_soloader }, // TODO: implement or stub with warning
         { "lstat", (uintptr_t)&lstat },
         { "mkdir", (uintptr_t)&mkdir },
 #ifndef NDK_PORT
         { "pipe", (uintptr_t)&pipe },
-        { "read", (uintptr_t)&read },
+        { "read", (uintptr_t)&read_soloader },
 #else
         { "pipe", (uintptr_t)&fndk_pipe },
         { "read", (uintptr_t)&fndk_read },

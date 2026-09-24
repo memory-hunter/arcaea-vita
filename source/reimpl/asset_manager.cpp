@@ -8,6 +8,7 @@
 #include <libc_bridge/libc_bridge.h>
 #include <string>
 #include <fcntl.h>
+#include "reimpl/io.h"
 
 typedef struct assetManager {
     int dummy = 0; // TODO: mb we will need to store something here in future
@@ -17,6 +18,8 @@ typedef struct assetManager {
 typedef struct aAsset {
     char * filename;
     FILE* f;
+    int32_t fiosHandle;
+    bool useFios;
     size_t bytesRead;
     size_t fileSize;
     bool opened = false;
@@ -41,14 +44,30 @@ AAsset* AAssetManager_open(AAssetManager* mgr, const char* filename, int mode) {
     std::string realp = std::string(DATA_PATH) + std::string("assets/") + std::string(filename);
 
     auto * a = new aAsset;
+    a->f = nullptr;
+    a->fiosHandle = -1;
+    a->useFios = false;
     a->filename = (char *) malloc(realp.length() + 1);
     strcpy(a->filename, realp.c_str());
     a->bytesRead = 0;
 
+    a->fiosHandle = fios_asset_open(realp.c_str());
+    if (a->fiosHandle >= 0) {
+        a->useFios = true;
+        int64_t size = fios_asset_seek(a->fiosHandle, 0, SEEK_END);
+        if (size >= 0 && fios_asset_seek(a->fiosHandle, 0, SEEK_SET) >= 0) {
+            a->fileSize = (size_t)size;
+            a->opened = true;
+        } else {
+            fios_asset_close(a->fiosHandle);
+            a->useFios = false;
+        }
+    }
+    if (!a->opened) {
 #ifdef USE_SCELIBC_IO
     a->f = sceLibcBridge_fopen((const char *)a->filename, "r");
 #else
-    a->f = fopen((cost char *)a->filename, "r");
+    a->f = fopen((const char *)a->filename, "r");
 #endif
 
     if (!a->f) {
@@ -67,6 +86,7 @@ AAsset* AAssetManager_open(AAssetManager* mgr, const char* filename, int mode) {
 #endif
         a->opened = true;
     }
+    }
 
     l_debug("AAssetManager_open<%p>(%p, %s, %i): %p", __builtin_return_address(0), mgr, realp.c_str(), mode, a);
     return (AAsset *) a;
@@ -78,7 +98,9 @@ void AAsset_close(AAsset* asset) {
     if (asset) {
         auto * a = (aAsset *) asset;
         free(a->filename);
-        if (a->opened) {
+        if (a->useFios) {
+            fios_asset_close(a->fiosHandle);
+        } else if (a->opened) {
 #ifdef USE_SCELIBC_IO
             sceLibcBridge_fclose(a->f);
 #else
@@ -101,7 +123,11 @@ int AAsset_read(AAsset* asset, void* buf, size_t count) {
     if (!a->opened) {
         return -1;
     }
-
+    if (a->useFios) {
+        int64_t ret = fios_asset_read(a->fiosHandle, buf, (int64_t)count);
+        if (ret > 0) { a->bytesRead += (size_t)ret; return (int)ret; }
+        return ret == 0 ? 0 : -1;
+    }
 #ifdef USE_SCELIBC_IO
     size_t ret = sceLibcBridge_fread(buf, 1, count, a->f);
 #else
@@ -133,9 +159,8 @@ off_t AAsset_seek(AAsset* asset, off_t offset, int whence) {
 
     auto * a = (aAsset *) asset;
 
-    if (!a->opened) {
-        return -1;
-    }
+    if (!a->opened) return -1;
+    if (a->useFios) return (off_t)fios_asset_seek(a->fiosHandle, offset, whence);
 
 #ifdef USE_SCELIBC_IO
     auto ret = (off_t) sceLibcBridge_fseek(a->f, offset, whence);
@@ -154,10 +179,11 @@ off_t AAsset_getRemainingLength(AAsset* asset) {
 
     auto * a = (aAsset *) asset;
 
-    if (!a->opened) {
-        return -1;
+    if (!a->opened) return -1;
+    if (a->useFios) {
+        int64_t pos = fios_asset_seek(a->fiosHandle, 0, SEEK_CUR);
+        return pos < 0 ? -1 : (off_t)(a->fileSize - (size_t)pos);
     }
-
     return (off_t)(a->fileSize - a->bytesRead);
 }
 
@@ -195,6 +221,10 @@ int AAsset_openFileDescriptor(AAsset* asset, off_t* outStart, off_t* outLength) 
     auto * a = (aAsset *) asset;
     if (outStart) *outStart = 0;
     if (outLength) *outLength = a->fileSize;
+    if (a->useFios) {
+        l_warn("AAsset_openFileDescriptor: FIOS archive assets do not expose a POSIX descriptor");
+        return -1;
+    }
     if (a->opened) {
         if (a->opened) {
 #ifdef USE_SCELIBC_IO

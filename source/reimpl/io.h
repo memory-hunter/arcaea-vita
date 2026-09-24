@@ -20,6 +20,8 @@ extern "C" {
 #endif
 
 #include <stdio.h>
+#include <stdint.h>
+#include <sys/types.h>
 #include <sys/dirent.h>
 #include <sys/syslimits.h>
 #include <sys/fcntl.h>
@@ -70,6 +72,24 @@ typedef struct __attribute__((__packed__)) dirent64_bionic {
 int open_soloader(const char * path, int oflag, ...);
 
 FILE * fopen_soloader(const char * filename, const char * mode);
+size_t fread_soloader(void *ptr, size_t size, size_t count, FILE *stream);
+int fseek_soloader(FILE *stream, long offset, int whence);
+long ftell_soloader(FILE *stream);
+int feof_soloader(FILE *stream);
+int ferror_soloader(FILE *stream);
+int fgetc_soloader(FILE *stream);
+int getc_soloader(FILE *stream);
+char *fgets_soloader(char *buffer, int size, FILE *stream);
+ssize_t read_soloader(int fd, void *buffer, size_t count);
+
+/* FIOS-backed assets are identified using the prefix-free manifest paths. */
+int fios_asset_path(const char *path, char *normalized, size_t normalized_size,
+                    char *fios_path, size_t fios_path_size);
+int32_t fios_asset_open(const char *path);
+int64_t fios_asset_size(int32_t handle);
+int64_t fios_asset_read(int32_t handle, void *buffer, int64_t length);
+int64_t fios_asset_seek(int32_t handle, int64_t offset, int whence);
+int fios_asset_close(int32_t handle);
 
 DIR *opendir_soloader(char *name);
 
@@ -95,6 +115,7 @@ int ioctl_soloader(int fd, int request, ... /* arg */);
 int fsync_soloader(int fd);
 
 _off64_t lseek64_soloader(int fd, _off64_t offset, int whence);
+off_t lseek_soloader(int fd, off_t offset, int whence);
 
 #ifdef __cplusplus
 };
