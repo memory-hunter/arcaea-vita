@@ -1,5 +1,5 @@
 <h1 align="center">
-<img align="center" src="extras/livearea/pic0.png" width="50%"><br>
+<img align="center" src="extras/livearea/bg0.png" width="50%"><br>
 Arcaea · PSVita Port
 </h1>
 <p align="center">
