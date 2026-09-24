@@ -101,6 +101,7 @@ set(SOURCES
     source/java.c
     source/patch.c
     source/SharedPreferences.cpp
+    source/reimpl/_existing_files.c
     source/reimpl/bits/_ctype.c
     source/reimpl/errno.c
     source/reimpl/io.c
