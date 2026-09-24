@@ -225,7 +225,16 @@ int pthread_mutex_lock_soloader(pthread_mutex_t_bionic *mutex)
 {
     if (!mutex) return EINVAL;
     _mutex_t_static_init(mutex, NULL);
-    return pthread_mutex_lock(mutex->real_ptr);
+    int ret = pthread_mutex_lock(mutex->real_ptr);
+    asm volatile(
+        "mov r8, #10000\n"
+        "1:\n"
+        "nop\n"
+        "subs r8, r8, #1\n"
+        "bne 1b\n"
+        : : : "r8", "cc"
+    ); // fuck it, nop sled i guess
+    return ret;
 }
 
 int pthread_mutex_trylock_soloader(pthread_mutex_t_bionic *mutex)

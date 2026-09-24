@@ -32,14 +32,18 @@
 #define LOAD_ADDRESS 0x98000000
 
 extern so_module so_mod;
+extern so_module fmod_mod;
+extern so_module provider_mod;
 
-void soloader_init_all() {
-	// Launch `app0:configurator.bin` on `-config` init param
+void soloader_init_all()
+{
+    // Launch `app0:configurator.bin` on `-config` init param
     sceAppUtilInit(&(SceAppUtilInitParam){}, &(SceAppUtilBootParam){});
     SceAppUtilAppEventParam eventParam;
     sceClibMemset(&eventParam, 0, sizeof(SceAppUtilAppEventParam));
     sceAppUtilReceiveAppEvent(&eventParam);
-    if (eventParam.type == 0x05) {
+    if (eventParam.type == 0x05)
+    {
         char buffer[2048];
         sceAppUtilAppEventParseLiveArea(&eventParam, buffer);
         if (strstr(buffer, "-config"))
@@ -57,25 +61,54 @@ void soloader_init_all() {
         l_success("FIOS initialized.");
 #endif
 
-    if (!module_loaded("kubridge")) {
+    if (!module_loaded("kubridge"))
+    {
         l_fatal("kubridge is not loaded.");
         fatal_error("Error: kubridge.skprx is not installed.");
     }
     l_success("kubridge check passed.");
 
-    if (!file_exists(SO_PATH)) {
+    if (!file_exists(SO_PATH))
+    {
         fatal_error("Looks like you haven't installed the data files for this "
                     "port, or they are in an incorrect location. Please make "
-                    "sure that you have %s file exactly at that path.", SO_PATH);
+                    "sure that you have %s file exactly at that path.",
+                    SO_PATH);
     }
 
-    if (so_file_load(&so_mod, SO_PATH, LOAD_ADDRESS) < 0) {
+    if (!file_exists(PROVIDER_PATH))
+    {
+        fatal_error("Looks like you haven't installed the data files for this "
+                    "port, or they are in an incorrect location. Please make "
+                    "sure that you have %s file exactly at that path.",
+                    PROVIDER_PATH);
+    }
+
+    if (so_file_load(&provider_mod, PROVIDER_PATH, LOAD_ADDRESS + 0x01000000) < 0)
+    {
+        l_fatal("SO could not be loaded.");
+        fatal_error("Error: could not load %s.", PROVIDER_PATH);
+    }
+    if (so_file_load(&so_mod, SO_PATH, LOAD_ADDRESS) < 0)
+    {
         l_fatal("SO could not be loaded.");
         fatal_error("Error: could not load %s.", SO_PATH);
     }
 
     settings_load();
     l_success("Settings loaded.");
+
+    so_relocate(&provider_mod);
+    l_success("SO relocated.");
+
+    resolve_imports(&provider_mod);
+    l_success("SO imports resolved.");
+
+    so_flush_caches(&provider_mod);
+    l_success("SO caches flushed.");
+
+    so_initialize(&provider_mod);
+    l_success("SO initialized.");
 
     so_relocate(&so_mod);
     l_success("SO relocated.");

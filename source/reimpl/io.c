@@ -30,12 +30,28 @@
 // void stat_newlib_to_bionic(struct stat * src, stat64_bionic * dst);
 #include "reimpl/bits/_struct_converters.c"
 
+static const char *fix_android_path(const char *path, char *buf, size_t buf_size)
+{
+	static const char *prefix = "/data/data/";
+	size_t prefix_len = strlen(prefix);
+
+	if (strncmp(path, prefix, prefix_len) == 0)
+	{
+		snprintf(buf, buf_size, "%s%s", "ux0:data/", path + prefix_len);
+		return buf;
+	}
+	return path;
+}
+
 FILE * fopen_soloader(const char * filename, const char * mode) {
     if (strcmp(filename, "/proc/cpuinfo") == 0) {
         return fopen_soloader("app0:/cpuinfo", mode);
     } else if (strcmp(filename, "/proc/meminfo") == 0) {
         return fopen_soloader("app0:/meminfo", mode);
     }
+
+    char remapped[512];
+	filename = fix_android_path(filename, remapped, sizeof(remapped));
 
 #ifdef USE_SCELIBC_IO
     FILE* ret = sceLibcBridge_fopen(filename, mode);
@@ -182,4 +198,11 @@ int fsync_soloader(int fd) {
     int ret = fsync(fd);
     l_debug("fsync(%i): %i", fd, ret);
     return ret;
+}
+
+_off64_t lseek64_soloader(int fd, _off64_t offset, int whence)
+{
+	_off64_t ret = lseek(fd, offset, whence);
+	l_debug("lseek64(%i, %lld, %i): %lld", fd, (long long)offset, whence, (long long)ret);
+	return ret;
 }

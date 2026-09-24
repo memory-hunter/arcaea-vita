@@ -27,6 +27,7 @@
 #include <zlib.h>
 #include <locale.h>
 #include <poll.h>
+#include <string.h>
 
 #include <sys/stat.h>
 #include <sys/unistd.h>
@@ -129,11 +130,105 @@ extern const char *BIONIC_ctype_;
 extern const short *BIONIC_tolower_tab_;
 extern const short *BIONIC_toupper_tab_;
 
+extern void *_ZN4FMOD14ChannelControl9setVolumeEf;
+extern void *_ZN4FMOD6System10getChannelEiPPNS_7ChannelE;
+extern void *_ZN4FMOD14ChannelControl4stopEv;
+extern void *_ZN4FMOD6System6updateEv;
+extern void *_ZN4FMOD6System12mixerSuspendEv;
+extern void *_ZN4FMOD6System11mixerResumeEv;
+extern void *FMOD_System_Create;
+extern void *_ZN4FMOD6System17setSoftwareFormatEi16FMOD_SPEAKERMODEi;
+extern void *_ZN4FMOD6System4initEijPv;
+extern void *_ZN4FMOD6System12createStreamEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE;
+extern void *_ZN4FMOD5Sound7setModeEj;
+extern void *_ZN4FMOD6System9playSoundEPNS_5SoundEPNS_12ChannelGroupEbPPNS_7ChannelE;
+extern void *_ZN4FMOD5Sound7releaseEv;
+extern void *_ZN4FMOD14ChannelControl9setPausedEb;
+extern void *_ZN4FMOD7Channel12setLoopCountEi;
+extern void *_ZN4FMOD7Channel11getPositionEPjj;
+extern void *_ZN4FMOD7Channel11setPositionEjj;
+extern void *_ZN4FMOD7Channel8getIndexEPi;
+extern void *_ZN4FMOD13System_CreateEPPNS_6SystemE;
+extern void *_ZN4FMOD6System9setOutputE15FMOD_OUTPUTTYPE;
+extern void *_ZN4FMOD6System16setDSPBufferSizeEji;
+extern void *_ZN4FMOD6System17getSoftwareFormatEPiP16FMOD_SPEAKERMODES1_;
+extern void *_ZN4FMOD14ChannelControl11getDSPClockEPyS1_;
+extern void *_ZN4FMOD14ChannelControl8setDelayEyyb;
+extern int _ZN4FMOD6System11createSoundEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE(void *system, const char *name_or_data, unsigned int mode, void *exinfo, void **sound);
+
+static const char *ANDROID_ASSET_PREFIX = "file:///android_asset/";
+
+const char *remap_fmod_path(const char *name_or_data, unsigned int mode, char *out_buf, size_t out_buf_size)
+{
+	size_t prefix_len = strlen(ANDROID_ASSET_PREFIX);
+	if (strncmp(name_or_data, ANDROID_ASSET_PREFIX, prefix_len) == 0)
+	{
+	    const char *rel_path = name_or_data + prefix_len;
+		snprintf(out_buf, out_buf_size, "%s%s", DATA_PATH"assets/", rel_path);
+		return out_buf;
+	}
+
+	return name_or_data;
+}
+
+int FMOD_System_CreateSound_hook(void *system, const char *name_or_data, unsigned int mode, void *exinfo, void **sound)
+{
+	char remapped_path[512];
+	const char *final_path = remap_fmod_path(name_or_data, mode, remapped_path, sizeof(remapped_path));
+
+	l_debug("FMOD::System::createSound(system=%p, name=\"%s\" -> \"%s\", mode=0x%x, exinfo=%p, sound=%p)",system, name_or_data ? name_or_data : "(null)", final_path ? final_path : "(null)", mode, exinfo, sound);
+
+	int ret = _ZN4FMOD6System11createSoundEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE(system, final_path, mode, exinfo, sound);
+
+	return ret;
+}
+
 static FILE __sF_fake[3];
 
 void *dlsym_soloader(void * handle, const char * symbol);
 
+int __fpclassifyd_soloader(double d) { return fpclassify(d); }
+int __signbit_soloader(double d) { return signbit(d); }
+int __isfinite_soloader(double d) { return isfinite(d); }
+
+char *getcwd_hook(char *buf, size_t size)
+{
+    if (buf && size > 0) {
+        snprintf(buf, size, "ux0:");
+    }
+
+    l_debug("getcwd(buf=%p, size=%zu) = \"%s\"", buf, size, buf ? buf : "(null)");
+
+    return buf;
+}
+
 so_default_dynlib default_dynlib[] = {
+        // FMOD Studio
+        { "_ZN4FMOD14ChannelControl9setVolumeEf", (uintptr_t)&_ZN4FMOD14ChannelControl9setVolumeEf },
+        { "_ZN4FMOD6System10getChannelEiPPNS_7ChannelE", (uintptr_t)&_ZN4FMOD6System10getChannelEiPPNS_7ChannelE },
+        { "_ZN4FMOD14ChannelControl4stopEv", (uintptr_t)&_ZN4FMOD14ChannelControl4stopEv },
+        { "_ZN4FMOD6System6updateEv", (uintptr_t)&_ZN4FMOD6System6updateEv },
+        { "_ZN4FMOD6System12mixerSuspendEv", (uintptr_t)&_ZN4FMOD6System12mixerSuspendEv },
+        { "_ZN4FMOD6System11mixerResumeEv", (uintptr_t)&_ZN4FMOD6System11mixerResumeEv },
+        { "FMOD_System_Create", (uintptr_t)&_ZN4FMOD13System_CreateEPPNS_6SystemE },
+        { "_ZN4FMOD6System17setSoftwareFormatEi16FMOD_SPEAKERMODEi", (uintptr_t)&_ZN4FMOD6System17setSoftwareFormatEi16FMOD_SPEAKERMODEi },
+        { "_ZN4FMOD6System4initEijPv", (uintptr_t)&_ZN4FMOD6System4initEijPv },
+        { "_ZN4FMOD6System12createStreamEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE", (uintptr_t)&_ZN4FMOD6System12createStreamEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE },
+        { "_ZN4FMOD5Sound7setModeEj", (uintptr_t)&_ZN4FMOD5Sound7setModeEj },
+        { "_ZN4FMOD6System9playSoundEPNS_5SoundEPNS_12ChannelGroupEbPPNS_7ChannelE", (uintptr_t)&_ZN4FMOD6System9playSoundEPNS_5SoundEPNS_12ChannelGroupEbPPNS_7ChannelE },
+        { "_ZN4FMOD5Sound7releaseEv", (uintptr_t)&_ZN4FMOD5Sound7releaseEv },
+        { "_ZN4FMOD14ChannelControl9setPausedEb", (uintptr_t)&_ZN4FMOD14ChannelControl9setPausedEb },
+        { "_ZN4FMOD7Channel12setLoopCountEi", (uintptr_t)&_ZN4FMOD7Channel12setLoopCountEi },
+        { "_ZN4FMOD7Channel11getPositionEPjj", (uintptr_t)&_ZN4FMOD7Channel11getPositionEPjj },
+        { "_ZN4FMOD7Channel11setPositionEjj", (uintptr_t)&_ZN4FMOD7Channel11setPositionEjj },
+        { "_ZN4FMOD7Channel8getIndexEPi", (uintptr_t)&_ZN4FMOD7Channel8getIndexEPi },
+        { "_ZN4FMOD6System9setOutputE15FMOD_OUTPUTTYPE", (uintptr_t)&_ZN4FMOD6System9setOutputE15FMOD_OUTPUTTYPE },
+        { "_ZN4FMOD6System16setDSPBufferSizeEji", (uintptr_t)&_ZN4FMOD6System16setDSPBufferSizeEji },
+        { "_ZN4FMOD6System17getSoftwareFormatEPiP16FMOD_SPEAKERMODES1_", (uintptr_t)&_ZN4FMOD6System17getSoftwareFormatEPiP16FMOD_SPEAKERMODES1_ },
+        { "_ZN4FMOD14ChannelControl11getDSPClockEPyS1_", (uintptr_t)&_ZN4FMOD14ChannelControl11getDSPClockEPyS1_ },
+        { "_ZN4FMOD14ChannelControl8setDelayEyyb", (uintptr_t)&_ZN4FMOD14ChannelControl8setDelayEyyb },
+        { "_ZN4FMOD6System11createSoundEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE", (uintptr_t)&FMOD_System_CreateSound_hook },
+
         // Common C/C++ internals
         { "_ZNSt8bad_castD1Ev", (uintptr_t)&_ZNSt8bad_castD1Ev },
         { "_ZNSt9exceptionD2Ev", (uintptr_t)&_ZNSt9exceptionD2Ev },
@@ -492,9 +587,9 @@ so_default_dynlib default_dynlib[] = {
         { "fseeko", (uintptr_t)&fseeko }, // TODO: wrap normal fseek for SceLibc version?
         { "ftello", (uintptr_t)&ftello },
         { "ftruncate", (uintptr_t)&ftruncate },
-        { "getcwd", (uintptr_t)&getcwd },
+        { "getcwd", (uintptr_t)&getcwd_hook },
         { "lseek", (uintptr_t)&lseek },
-        { "lseek64", (uintptr_t)&ret0 }, // TODO: implement or stub with warning
+        { "lseek64", (uintptr_t)&lseek64_soloader }, // TODO: implement or stub with warning
         { "lstat", (uintptr_t)&lstat },
         { "mkdir", (uintptr_t)&mkdir },
 #ifndef NDK_PORT
@@ -1102,6 +1197,33 @@ so_default_dynlib default_dynlib[] = {
         { "inflateReset", (uintptr_t)&inflateReset },
         { "inflateReset2", (uintptr_t)&inflateReset2 },
         { "uncompress", (uintptr_t)&uncompress },
+
+        // arcaea
+        { "utimes", (uintptr_t)&utimes },
+        { "fputwc", (uintptr_t)&fputwc },
+        { "nextafter", (uintptr_t)&nextafter },
+        { "nextafterf", (uintptr_t)&nextafterf },
+        { "acosh", (uintptr_t)&acosh },
+        { "asinh", (uintptr_t)&asinh },
+        { "atanh", (uintptr_t)&atanh },
+        { "cbrt", (uintptr_t)&cbrt },
+        { "erf", (uintptr_t)&erf },
+        { "erfc", (uintptr_t)&erfc },
+        { "expm1", (uintptr_t)&expm1 },
+        { "hypot", (uintptr_t)&hypot },
+        { "lgamma", (uintptr_t)&lgamma },
+        { "llrint", (uintptr_t)&llrint },
+        { "log1p", (uintptr_t)&log1p },
+        { "logb", (uintptr_t)&logb },
+        { "nearbyint", (uintptr_t)&nearbyint },
+        { "remainder", (uintptr_t)&remainder },
+        { "remquo", (uintptr_t)&remquo },
+        { "tgamma", (uintptr_t)&tgamma },
+        { "scalbnl", (uintptr_t)&scalbnl },
+        { "isnanf", (uintptr_t)&__isnanf },
+        { "__fpclassifyd", (uintptr_t)&__fpclassifyd_soloader },
+        { "__signbit", (uintptr_t)&__signbit_soloader },
+        { "__isfinite", (uintptr_t)&__isfinite_soloader },
 };
 
 void *dlsym_soloader(void * handle, const char * symbol) {
