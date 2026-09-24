@@ -84,7 +84,7 @@ In order to properly install the game, you'll have to follow these steps precise
     ├── data.psarc
     └── base.apk
   ```
-- Install `arcaea.vpk` (from [Releases](https://github.com/memory-hunter/arcaea/releases/latest)).
+- Install `arcaea.vpk` (from [Releases](https://github.com/memory-hunter/arcaea-vita/releases/latest)).
 
 Controls
 -----------------
@@ -108,7 +108,7 @@ cmake --build build
 - [Andy "The FloW" Nguyen](https://github.com/TheOfficialFloW/) for the original .so loader.
 - [Rinnegatamante](https://github.com/Rinnegatamante/) for VitaGL and lots of help with understanding and debugging the loader.
 - [gl33ntwine](https://github.com/v-atamanenko/) for the [SoLoBoP (.**so** **lo**ader **bo**iler**p**late)](https://github.com/v-atamanenko/soloader-boilerplate/), help with the SharedPreferences parsing functions, this README.md as a template copied from [Baba is You! port](https://github.com/v-atamanenko/baba-is-you-vita/) and overall help.
-- **masteroga** for requesting this game and giving me a PS Vita ****** (😉) as a reward for it!
+- **masteroga** for requesting this game and giving me a PS Vita \*\*\*\*\*\* (😉) as a reward for it!
 
 ## License
 This software may be modified and distributed under the terms of
