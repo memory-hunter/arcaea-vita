@@ -46,7 +46,7 @@ In order to properly install the game, you'll have to follow these steps precise
 
 **Note** Don't install fd_fix.skprx if you're using rePatch plugin!
 - Make sure you have `libshacccg.suprx` in the `ur0:/data/` folder on your console. If you don't, follow [this guide](https://samilops2.gitbook.io/vita-troubleshooting-guide/shader-compiler/extract-libshacccg.suprx) to extract it.
-- <u>Legally</u> obtain your copy of [Arcaea](https://play.google.com/store/apps/details?id=com.fingersoft.hillclimb&hl=en) for Android in form of an `.apk` file and the data files in the format of `.obb`.
+- <u>Legally</u> obtain your copy of [Arcaea](https://play.google.com/store/apps/details?id=moe.low.arc&hl=en) for Android in form of an `.apk` file and the data files in the format of `.obb`.
   - The SHA256 hashes of the needed files should match so, you can check them using an online tool if you search it:
     ```text
     e37ee1deb4aa9a6e89abdd3dccf0c3508b65d87decf2a4fcf7488f0ad10f800d  data.obb
