@@ -37,15 +37,13 @@ their own legally obtained copy of the game in form of an .apk file.**
 In order to properly install the game, you'll have to follow these steps precisely:
 
 - Install [kubridge](https://github.com/TheOfficialFloW/kubridge/releases/) and [FdFix](https://github.com/TheOfficialFloW/FdFix/releases/) by copying `kubridge.skprx` and `fd_fix.skprx` to your taiHEN plugins folder (usually `ur0:tai`) and adding two entries to your `config.txt` under `*KERNEL`:
-- Extract `libfmodstudio.suprx` from PCSE01188 or PCSE01426 following [this guide](https://gist.github.com/hatoving/99253e1b3efdefeaf0ca66e0c5dc7089).
-  
 ```
   *KERNEL
   ur0:tai/kubridge.skprx
   ur0:tai/fd_fix.skprx
 ```
-
 **Note** Don't install fd_fix.skprx if you're using rePatch plugin!
+- Extract `libfmodstudio.suprx` from PCSE01188 or PCSE01426 following [this guide](https://gist.github.com/hatoving/99253e1b3efdefeaf0ca66e0c5dc7089).
 - Make sure you have `libshacccg.suprx` in the `ur0:/data/` folder on your console. If you don't, follow [this guide](https://samilops2.gitbook.io/vita-troubleshooting-guide/shader-compiler/extract-libshacccg.suprx) to extract it.
 - <u>Legally</u> obtain your copy of [Arcaea](https://play.google.com/store/apps/details?id=moe.low.arc&hl=en) for Android in form of an `.apk` file and the data files in the format of `.obb`.
   - The SHA256 hashes of the needed files should match so, you can check them using an online tool if you search it:
