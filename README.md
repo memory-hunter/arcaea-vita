@@ -37,6 +37,7 @@ their own legally obtained copy of the game in form of an .apk file.**
 In order to properly install the game, you'll have to follow these steps precisely:
 
 - Install [kubridge](https://github.com/TheOfficialFloW/kubridge/releases/) and [FdFix](https://github.com/TheOfficialFloW/FdFix/releases/) by copying `kubridge.skprx` and `fd_fix.skprx` to your taiHEN plugins folder (usually `ur0:tai`) and adding two entries to your `config.txt` under `*KERNEL`:
+- Extract `libfmodstudio.suprx` from PCSE01188 or PCSE01426 following [this guide](https://gist.github.com/hatoving/99253e1b3efdefeaf0ca66e0c5dc7089).
   
 ```
   *KERNEL
